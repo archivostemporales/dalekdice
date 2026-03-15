@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dalek Dice - TARDIS Console v6</title>
+    <style>
+        :root {
+            --tardis-blue: #003b6f;
+            --monitor-glow: #00d4ff;
+            --bg: #020508;
+            --color-doctor: #ff0000;
+            --color-human: #ff8c00;
+            --color-dalek: #2ecc71;
+            --color-ext: #00d4ff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg);
+            color: white;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            overflow: auto;
+        }
+
+        #sidebar {
+            width: 280px;
+            min-width: 280px;
+            background: rgba(0, 15, 30, 0.95);
+            border-right: 3px solid var(--tardis-blue);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .player-card {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid var(--tardis-blue);
+            margin: 10px;
+            padding: 12px;
+            border-radius: 5px;
+        }
+
+        .score-display {
+            font-size: 2.2em;
+            color: #fff;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 10px var(--monitor-glow);
+        }
+
+        #game-board {
+            flex-grow: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            min-width: 900px;
+        }
+
+        .dice-zone {
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            padding: 25px 15px 15px 15px;
+            min-height: 90px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            position: relative;
+            background-position: center;
+            background-size: cover;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* --- CONFIGURACIÓN DE FONDOS --- */
+        #zone-top { 
+            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/banner.png'); 
+        }
+        #zone-human { 
+            background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('images/soldiers.jpg'); 
+        }
+        #zone-dalek { 
+            background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('images/daleks.jpg'); 
+        }
+        #zone-center { 
+            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/vortex.webp');
+            border: 2px solid var(--monitor-glow);
+            box-shadow: inset 0 0 60px rgba(0, 212, 255, 0.4);
+        }
+        #zone-reroll { 
+            background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('images/tardis_interior.jpg'); 
+        }
+        /* ------------------------------- */
+
+        .dice-zone::before {
+            content: attr(data-label);
+            position: absolute;
+            top: -12px; left: 15px;
+            background: #050a10;
+            padding: 2px 10px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: var(--monitor-glow);
+            border: 1px solid var(--tardis-blue);
+            z-index: 2;
+        }
+
+        #zone-center {
+            min-height: 140px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .die-img {
+            width: 70px; height: 70px;
+            cursor: pointer; border-radius: 8px;
+            transition: 0.2s; border: 3px solid transparent;
+            z-index: 5;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(2px);
+        }
+
+        .die-doctor { border-color: var(--color-doctor); box-shadow: 0 0 15px var(--color-doctor); }
+        .die-human { border-color: var(--color-human); box-shadow: 0 0 15px var(--color-human); }
+        .die-dalek { border-color: var(--color-dalek); box-shadow: 0 0 15px var(--color-dalek); }
+        .die-ext { border-color: var(--color-ext); box-shadow: 0 0 15px var(--color-ext); animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); box-shadow: 0 0 25px var(--color-ext); }
+            100% { transform: scale(1); }
+        }
+
+        .main-btn {
+            background: var(--tardis-blue);
+            color: white;
+            border: 2px solid var(--monitor-glow);
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .main-btn:hover { background: var(--monitor-glow); color: black; }
+
+        #tardis-modal {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            justify-content: center; align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        #modal-content {
+            background: #050a10;
+            border: 3px solid var(--tardis-blue);
+            box-shadow: 0 0 30px var(--tardis-blue);
+            width: 450px;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #modal-message {
+            font-size: 1.3em;
+            color: #fff;
+            text-shadow: 0 0 10px var(--monitor-glow);
+            margin-bottom: 25px;
+            font-family: 'Courier New', monospace;
+        }
+
+        #start-screen {
+            position: fixed; inset: 0; background: #000; z-index: 1000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="tardis-modal">
+        <div id="modal-content">
+            <div id="modal-message"></div>
+            <button class="main-btn" onclick="cerrarModal()">ENTENDIDO</button>
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <h1 style="color: var(--monitor-glow); font-size: 3em; text-shadow: 0 0 20px var(--monitor-glow);">DALEK DICE</h1>
+        <button class="main-btn" style="font-size: 1.5em;" onclick="iniciar()">INICIAR SISTEMA</button>
+    </div>
+
+    <div id="sidebar">
+        <h2 style="text-align:center; color:var(--monitor-glow);">PUNTUACIÓN</h2>
+        <div id="players-list"></div>
+        <div style="padding: 20px; margin-top: auto; border-top: 1px solid var(--tardis-blue); display: flex; flex-direction: column;">
+            <button class="main-btn" onclick="toggleMusic()">MÚSICA ON/OFF</button>
+            <input type="range" id="vol" min="0" max="1" step="0.1" value="0.5" style="width:100%; margin: 10px 0;">
+            <button class="main-btn" style="background: #444; border-color: #fff;" onclick="window.open('images/dalek_dice.pdf', '_blank')">📜 RULES</button>
+            <button class="main-btn" style="background:#700;" onclick="resetTotal()">REINICIAR TODO</button>
+        </div>
+    </div>
+
+    <div id="game-board">
+        <div class="dice-zone" id="zone-top" data-label="ZONA SUPERIOR: SOLAMENTE 1 DOCTOR / 1 ¡EXTERMINAR! POR TURNO"></div>
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 20px;">
+            <div class="dice-zone" id="zone-human" data-label="HUMANOS: 0"></div>
+            <div class="dice-zone" id="zone-center" data-label="ZONA DE LANZAMIENTO"></div>
+            <div class="dice-zone" id="zone-dalek" data-label="DALEKS: 0"></div>
+        </div>
+        <div class="dice-zone" id="zone-reroll" data-label="ZONA INFERIOR: DOCTOR Y ¡EXTERMINAR! SOBRANTES (RE-LANZAR)"></div>
+        <div style="display:flex; justify-content: center; gap: 40px; margin-top: 10px;">
+            <button class="main-btn" style="font-size: 1.8em; padding: 15px 60px;" onclick="lanzar()">LANZAR DADOS</button>
+            <button class="main-btn" style="border-color: var(--color-human); color: var(--color-human);" onclick="plantarse()">PLANTARSE</button>
+        </div>
+    </div>
+
+    <audio id="audio-bg" loop src="audio/who.mp3"></audio>
+    <audio id="audio-click" src="audio/clic.mp3"></audio>
+    <audio id="audio-dice" src="audio/dice.mp3"></audio>
+    <audio id="audio-laser" src="audio/laser.mp3"></audio>
+    <audio id="audio-laugh" src="audio/robot_laugh.mp3"></audio>
+
+    <script>
+        const FACES = [
+            { type: 'doctor', img: 'images/doctor.png', val: 0, class: 'die-doctor' },
+            { type: 'human', img: 'images/humans2.png', val: 2, class: 'die-human' },
+            { type: 'human', img: 'images/humans4.png', val: 4, class: 'die-human' },
+            { type: 'dalek', img: 'images/daleks2.png', val: 2, class: 'die-dalek' },
+            { type: 'dalek', img: 'images/daleks3.png', val: 3, class: 'die-dalek' },
+            { type: 'exterminate', img: 'images/exterminate.png', val: 0, class: 'die-ext' }
+        ];
+
+        let scores = [0,0,0,0,0,0], dice = [], drs = 0, exts = 0, hasKeptThisRoll = false;
+
+        function mostrarModal(m) { document.getElementById('modal-message').innerHTML = m; document.getElementById('tardis-modal').style.display = 'flex'; }
+        function cerrarModal() { document.getElementById('audio-click').play(); document.getElementById('tardis-modal').style.display = 'none'; }
+        window.alert = mostrarModal;
+
+        function iniciar() { document.getElementById('start-screen').style.display = 'none'; document.getElementById('audio-bg').play(); renderScores(); prepararDados(); }
+
+        function renderScores() {
+            const list = document.getElementById('players-list');
+            list.innerHTML = '';
+            scores.forEach((s, i) => {
+                list.innerHTML += `<div class="player-card"><div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:bold; color:var(--monitor-glow)">D0${i+1}</span><div><button class="main-btn" style="padding:2px 8px" onclick="mod(${i},-1)">-</button><button class="main-btn" style="padding:2px 8px" onclick="mod(${i},1)">+</button></div></div><div class="score-display">${s}</div></div>`;
+            });
+        }
+
+        function mod(i, v) { document.getElementById('audio-click').play(); scores[i] = Math.max(0, scores[i] + v); renderScores(); }
+
+        function lanzar() {
+            let toRoll = dice.filter(d => d.state === 'pool' || d.state === 'reroll' || d.state === 'center');
+            if(dice.some(d => d.state === 'center') && !hasKeptThisRoll) {
+                alert("ERROR DE PROTOCOLO:<br><br>Debes seleccionar al menos un dado como 'Keeper' antes de volver a lanzar.");
+                return;
+            }
+            if(toRoll.length === 0) return;
+            document.getElementById('audio-dice').play();
+            hasKeptThisRoll = false;
+
+            let fDr = false, fEx = false;
+            toRoll.forEach(d => {
+                d.face = FACES[Math.floor(Math.random() * 6)];
+                if(d.face.type === 'doctor' && !fDr) { d.state = 'top'; drs++; fDr = true; hasKeptThisRoll = true; }
+                else if(d.face.type === 'exterminate' && !fEx) { d.state = 'top'; exts++; fEx = true; hasKeptThisRoll = true; }
+                else { d.state = 'center'; }
+            });
+
+            updateUI();
+            if(drs >= 3) { 
+                document.getElementById('audio-laser').play(); 
+                alert("¡EL DOCTOR INTERVIENE!<br><br>3 resultados del Doctor detectados. Invasión fallida."); 
+                resetTurno(); 
+            }
+        }
+
+        function updateUI() {
+            const zones = { 'top': 'zone-top', 'human': 'zone-human', 'dalek': 'zone-dalek', 'center': 'zone-center', 'reroll': 'zone-reroll' };
+            Object.values(zones).forEach(id => {
+                const z = document.getElementById(id);
+                if(z) z.querySelectorAll('.die-img').forEach(img => img.remove());
+            });
+            
+            let curH = 0, curD = 0;
+            dice.forEach(d => {
+                if(!d.face) return;
+                if(d.state === 'kept') {
+                    if(d.face.type === 'human') curH += d.face.val;
+                    if(d.face.type === 'dalek') curD += d.face.val;
+                }
+                const img = document.createElement('img');
+                img.src = d.face.img;
+                img.className = `die-img ${d.face.class}`;
+                img.onclick = () => {
+                    if(d.state === 'center') {
+                        document.getElementById('audio-click').play();
+                        if(d.face.type === 'human' || d.face.type === 'dalek') { d.state = 'kept'; hasKeptThisRoll = true; }
+                        else { d.state = 'reroll'; }
+                        updateUI();
+                    }
+                };
+                let dest = (d.state === 'kept') ? d.face.type : d.state;
+                const container = document.getElementById(zones[dest]);
+                if(container) container.appendChild(img);
+            });
+            
+            document.getElementById('zone-human').setAttribute('data-label', `HUMANOS: ${curH}`);
+            document.getElementById('zone-dalek').setAttribute('data-label', `DALEKS: ${curD}`);
+        }
+
+        function plantarse() {
+            let h = 0, d = 0;
+            dice.forEach(die => {
+                if(die.state === 'kept' || die.state === 'top') {
+                    if(die.face.type === 'human') h += die.face.val;
+                    if(die.face.type === 'dalek') d += die.face.val;
+                }
+            });
+            let pts = 0;
+            const allUsed = dice.every(die => ['kept', 'top'].includes(die.state));
+            
+            if(exts >= 3) { 
+                pts = h * 2; 
+                if(allUsed) { pts += 5; document.getElementById('audio-laugh').play(); }
+                alert(`¡EXTERMINATE!<br>Invasión total detectada. Puntos: ${pts}`); 
+            }
+            else if(d >= h) { 
+                pts = h; 
+                if(allUsed) { pts += 5; document.getElementById('audio-laugh').play(); }
+                alert(`CONQUISTA ÉXITOSA<br>Puntos: ${pts}`); 
+            }
+            else { 
+                document.getElementById('audio-laser').play(); 
+                alert("FALLO TÁCTICO: Los Daleks no superan a los humanos. 0 puntos."); 
+            }
+            resetTurno();
+        }
+
+        function prepararDados() { 
+            dice = Array(10).fill(null).map((_, i) => ({ id: i, state: 'pool', face: null })); 
+            drs = 0; exts = 0; hasKeptThisRoll = false; 
+        }
+
+        function resetTurno() { prepararDados(); updateUI(); }
+        function resetTotal() { if(confirm("¿Reiniciar toda la conquista?")) { scores = [0,0,0,0,0,0]; renderScores(); resetTurno(); } }
+        function toggleMusic() { const a = document.getElementById('audio-bg'); a.paused ? a.play() : a.pause(); }
+        document.getElementById('vol').oninput = (e) => { document.getElementById('audio-bg').volume = e.target.value; };
+    </script>
+</body>
+</html>
